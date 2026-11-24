@@ -23,7 +23,7 @@ class SearchBar(ctk.CTkFrame):
         self.entry.bind("<FocusOut>", self._on_focus_out)
 
         # Dropdown for autocomplete
-        self.dropdown = ctk.CTkScrollableFrame(master, width=400, height=200, fg_color=("gray95", "gray15"))
+        self.dropdown = ctk.CTkScrollableFrame(self, width=400, height=200, fg_color=("gray95", "gray15"))
 
     def _on_keyrelease(self, event):
         if event.keysym in ("Up", "Down", "Left", "Right", "Escape", "Return", "Tab"):
@@ -64,7 +64,7 @@ class SearchBar(ctk.CTkFrame):
             btn.pack(fill="x", padx=5, pady=2)
 
         if not self.dropdown_visible:
-            self.dropdown.pack(side="left", padx=10, pady=(0, 10), fill="y", before=self.master.list_frame if hasattr(self.master, 'list_frame') else None)
+            self.dropdown.pack(side="left", padx=10, pady=(0, 10), fill="y", after=self.entry)
             self.dropdown_visible = True
             self.dropdown.lift()
 
