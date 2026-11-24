@@ -50,3 +50,6 @@ htmlcov/
 
 # Distribution
 *.whl
+
+# Logs
+logs.txt

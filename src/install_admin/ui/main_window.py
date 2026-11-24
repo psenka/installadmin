@@ -36,6 +36,7 @@ class MainWindow(ctk.CTk):
         self.batch_size = 20
         self.loaded_count = 0
         self.loading_more = False
+        self.first_load_done = False
 
         self._setup_ui()
         self._load_packages()
@@ -90,6 +91,7 @@ class MainWindow(ctk.CTk):
         def on_loaded(packages: List[Package]):
             self.packages = packages
             self.loaded_count = 0
+            self.first_load_done = False
             self._load_next_batch()
             self.status_var.set(f"Nalezeno {len(packages)} balíčků")
             self.refresh_btn.configure(state="normal")
@@ -117,7 +119,13 @@ class MainWindow(ctk.CTk):
             self.load_more_btn.destroy()
 
         sorted_packages = sorted(self.packages, key=lambda p: (not p.has_update, p.name.lower()))
-        remaining = sorted_packages[self.loaded_count:self.loaded_count + self.batch_size]
+        
+        # First load: batch_size items; subsequent loads: all remaining
+        if not self.first_load_done:
+            remaining = sorted_packages[self.loaded_count:self.loaded_count + self.batch_size]
+            self.first_load_done = True
+        else:
+            remaining = sorted_packages[self.loaded_count:]
 
         for pkg in remaining:
             row = PackageRow(self.list_frame, pkg, on_refresh=self._load_packages, on_status=self._set_status)
