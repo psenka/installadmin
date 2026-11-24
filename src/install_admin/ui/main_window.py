@@ -68,7 +68,9 @@ class MainWindow(ctk.CTk):
         for widget in self.list_frame.winfo_children():
             widget.destroy()
 
-        for pkg in self.packages:
+        sorted_packages = sorted(self.packages, key=lambda p: (not p.has_update, p.name.lower()))
+
+        for pkg in sorted_packages:
             row = PackageRow(self.list_frame, pkg, on_refresh=self._load_packages, on_status=self._set_status)
             row.pack(fill="x", padx=5, pady=5)
 
