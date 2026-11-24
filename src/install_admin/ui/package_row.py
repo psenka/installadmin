@@ -1,7 +1,14 @@
 import customtkinter as ctk
+import tkinter as tk
+from tkinter import messagebox
 from typing import Callable
 from install_admin.models.package import Package
 from install_admin.core.winget import WingetClient
+
+
+def show_error(parent, title: str, message: str):
+    """Show error dialog to user."""
+    messagebox.showerror(title, message, parent=parent)
 
 
 class PackageRow(ctk.CTkFrame):
@@ -71,6 +78,7 @@ class PackageRow(ctk.CTkFrame):
                 self.on_refresh()
             else:
                 self.on_status(f"Chyba při odinstalování {self.package.name}")
+                show_error(self, "Chyba", f"Nepodařilo se odinstalovat {self.package.name}")
 
         self.winget.uninstall_async(self.package.id, on_done)
 
@@ -87,6 +95,7 @@ class PackageRow(ctk.CTkFrame):
                 self.on_refresh()
             else:
                 self.on_status(f"Chyba při aktualizaci {self.package.name}")
+                show_error(self, "Chyba", f"Nepodařilo se aktualizovat {self.package.name}")
 
         self.winget.upgrade_async(self.package.id, on_done)
 

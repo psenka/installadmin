@@ -1,10 +1,26 @@
 import customtkinter as ctk
 import tkinter as tk
+from tkinter import messagebox
 from typing import List
 from .search_bar import SearchBar, ThemeToggle
 from .package_row import PackageRow
 from ..core.winget import WingetClient
 from ..models.package import Package
+
+
+def show_error(parent, title: str, message: str):
+    """Show error dialog to user."""
+    messagebox.showerror(title, message, parent=parent)
+
+
+def show_warning(parent, title: str, message: str):
+    """Show warning dialog to user."""
+    messagebox.showwarning(title, message, parent=parent)
+
+
+def show_info(parent, title: str, message: str):
+    """Show info dialog to user."""
+    messagebox.showinfo(title, message, parent=parent)
 
 
 class MainWindow(ctk.CTk):
@@ -78,7 +94,12 @@ class MainWindow(ctk.CTk):
             self.status_var.set(f"Nalezeno {len(packages)} balíčků")
             self.refresh_btn.configure(state="normal")
 
-        self.winget.list_installed_async(on_loaded)
+        def on_error(error: Exception):
+            self.status_var.set("Chyba při načítání balíčků")
+            self.refresh_btn.configure(state="normal")
+            show_error(self, "Chyba", f"Nepodařilo se načíst seznam balíčků:\n{error}")
+
+        self.winget.list_installed_async(on_loaded, on_error)
 
     def _render_package_list(self):
         for widget in self.list_frame.winfo_children():

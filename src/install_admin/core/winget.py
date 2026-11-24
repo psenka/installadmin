@@ -22,13 +22,16 @@ class WingetClient:
             raise RuntimeError(f"winget list failed: {result.stderr}")
         return self._parse_list_output(result.stdout)
 
-    def list_installed_async(self, callback: Callable[[List[Package]], None]):
+    def list_installed_async(self, callback: Callable[[List[Package]], None], error_callback: Callable[[Exception], None] = None):
         def worker():
             try:
                 packages = self.list_installed()
                 callback(packages)
             except Exception as e:
-                callback([])
+                if error_callback:
+                    error_callback(e)
+                else:
+                    callback([])
         threading.Thread(target=worker, daemon=True).start()
 
     def _parse_list_output(self, output: str) -> List[Package]:
