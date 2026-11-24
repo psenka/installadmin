@@ -6,11 +6,12 @@ from install_admin.models.package import Package
 
 
 class SearchBar(ctk.CTkFrame):
-    def __init__(self, master, on_search: Callable[[str], None], on_select: Callable[[Package], None]):
+    def __init__(self, master, on_search: Callable[[str], None], on_select: Callable[[Package], None], get_installed_ids: Callable[[], set] = None):
         super().__init__(master, fg_color="transparent")
         self.winget = WingetClient()
         self.on_search = on_search
         self.on_select = on_select
+        self.get_installed_ids = get_installed_ids or (lambda: set())
         self.debounce_timer = None
         self.dropdown_visible = False
 
@@ -53,13 +54,25 @@ class SearchBar(ctk.CTkFrame):
             self._hide_dropdown()
             return
 
-        for pkg in packages[:10]:
+        installed_ids = self.get_installed_ids()
+        
+        # Sort: installed packages first, then by name
+        sorted_packages = sorted(packages, key=lambda p: (p.id not in installed_ids, p.name.lower()))
+
+        for pkg in sorted_packages[:10]:
+            is_installed = pkg.id in installed_ids
+            text = f"{pkg.name} ({pkg.id}) v{pkg.version}"
+            if is_installed:
+                text += " ✓ nainstalováno"
+            
             btn = ctk.CTkButton(
                 self.dropdown,
-                text=f"{pkg.name} ({pkg.id}) v{pkg.version}",
+                text=text,
                 anchor="w",
                 height=32,
-                command=lambda p=pkg: self._on_package_click(p)
+                command=lambda p=pkg: self._on_package_click(p),
+                fg_color=("gray85", "gray25") if is_installed else None,
+                text_color=("green", "lightgreen") if is_installed else None,
             )
             btn.pack(fill="x", padx=5, pady=2)
 

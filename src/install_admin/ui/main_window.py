@@ -34,7 +34,12 @@ class MainWindow(ctk.CTk):
         top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         top_bar.grid_columnconfigure(0, weight=1)
 
-        self.search_bar = SearchBar(top_bar, on_search=self._on_search, on_select=self._on_package_selected)
+        self.search_bar = SearchBar(
+            top_bar,
+            on_search=self._on_search,
+            on_select=self._on_package_selected,
+            get_installed_ids=lambda: {p.id for p in self.packages}
+        )
         self.search_bar.grid(row=0, column=0, sticky="ew")
 
         self.theme_toggle = ThemeToggle(top_bar, on_toggle=self._on_theme_change)
