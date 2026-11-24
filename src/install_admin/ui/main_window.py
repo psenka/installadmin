@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import tkinter as tk
 from typing import List
 from .search_bar import SearchBar, ThemeToggle
 from .package_row import PackageRow
@@ -15,6 +16,10 @@ class MainWindow(ctk.CTk):
 
         self.winget = WingetClient()
         self.packages: List[Package] = []
+        self.displayed_packages: List[Package] = []
+        self.batch_size = 20
+        self.loaded_count = 0
+        self.loading_more = False
 
         self._setup_ui()
         self._load_packages()
@@ -39,6 +44,11 @@ class MainWindow(ctk.CTk):
         self.list_frame = ctk.CTkScrollableFrame(self, label_text="Nainstalované aplikace")
         self.list_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.list_frame.grid_columnconfigure(0, weight=1)
+        
+        # Bind scroll event for lazy loading
+        self.list_frame._scrollbar.bind("<ButtonRelease-1>", self._on_scroll)
+        self.list_frame._parent_canvas.bind("<MouseWheel>", self._on_scroll)
+        self.list_frame._parent_canvas.bind("<Configure>", self._on_scroll)
 
         # Status bar
         self.status_var = ctk.StringVar(value="Připraveno")
@@ -58,7 +68,8 @@ class MainWindow(ctk.CTk):
 
         def on_loaded(packages: List[Package]):
             self.packages = packages
-            self._render_package_list()
+            self.loaded_count = 0
+            self._load_next_batch()
             self.status_var.set(f"Nalezeno {len(packages)} balíčků")
             self.refresh_btn.configure(state="normal")
 
@@ -73,6 +84,51 @@ class MainWindow(ctk.CTk):
         for pkg in sorted_packages:
             row = PackageRow(self.list_frame, pkg, on_refresh=self._load_packages, on_status=self._set_status)
             row.pack(fill="x", padx=5, pady=5)
+
+    def _load_next_batch(self):
+        # Remove load more button if exists
+        if hasattr(self, 'load_more_btn'):
+            self.load_more_btn.destroy()
+
+        sorted_packages = sorted(self.packages, key=lambda p: (not p.has_update, p.name.lower()))
+        remaining = sorted_packages[self.loaded_count:self.loaded_count + self.batch_size]
+
+        for pkg in remaining:
+            row = PackageRow(self.list_frame, pkg, on_refresh=self._load_packages, on_status=self._set_status)
+            row.pack(fill="x", padx=5, pady=5)
+
+        self.loaded_count += len(remaining)
+        self.loading_more = False
+
+        if self.loaded_count < len(sorted_packages):
+            self._add_load_more_button()
+
+    def _add_load_more_button(self):
+        load_more_btn = ctk.CTkButton(
+            self.list_frame,
+            text=f"Načíst další ({len(sorted(self.packages, key=lambda p: (not p.has_update, p.name.lower()))) - self.loaded_count} zbývá)",
+            command=self._load_next_batch,
+            height=36
+        )
+        load_more_btn.pack(fill="x", padx=5, pady=5)
+        self.load_more_btn = load_more_btn
+
+    def _on_scroll(self, event=None):
+        """Check if user scrolled near bottom and load more if needed."""
+        if self.loading_more or self.loaded_count >= len(self.packages):
+            return
+        
+        canvas = self.list_frame._parent_canvas
+        try:
+            scroll_top = canvas.yview()[0]
+            scroll_bottom = canvas.yview()[1]
+            
+            # Load more when user is within 10% of bottom
+            if scroll_bottom > 0.9:
+                self.loading_more = True
+                self._load_next_batch()
+        except (tk.TclError, AttributeError):
+            pass
 
     def _on_search(self, query: str):
         self.status_var.set(f"Vyhledávám: {query}...")
