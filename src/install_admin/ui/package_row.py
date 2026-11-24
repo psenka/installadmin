@@ -31,6 +31,10 @@ class PackageRow(ctk.CTkFrame):
 
         self.update_indicator = ctk.CTkLabel(version_frame, text="", text_color="orange", font=ctk.CTkFont(size=11))
         self.update_indicator.pack(side="left", padx=5)
+        
+        # Show available version immediately if update exists
+        if package.has_update:
+            self.update_indicator.configure(text=f"→ v{package.available_version}", text_color="orange")
 
         # Buttons frame
         self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
