@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from typing import Callable, Optional
+from typing import Callable
 from install_admin.models.package import Package
 from install_admin.core.winget import WingetClient
 
@@ -11,21 +11,20 @@ class PackageRow(ctk.CTkFrame):
         self.on_refresh = on_refresh
         self.on_status = on_status
         self.winget = WingetClient()
-        self.checking_update = False
         self.action_in_progress = False
 
         self.grid_columnconfigure(1, weight=1)
 
         # Name & ID
         name_label = ctk.CTkLabel(self, text=package.name, font=ctk.CTkFont(weight="bold"), anchor="w")
-        name_label.grid(row=0, column=0, padx=10, pady=(8, 2), sticky="w")
+        name_label.grid(row=0, column=0, padx=10, pady=(4, 1), sticky="w")
 
         id_label = ctk.CTkLabel(self, text=package.id, text_color="gray", anchor="w", font=ctk.CTkFont(size=11))
-        id_label.grid(row=1, column=0, padx=10, pady=(0, 8), sticky="w")
+        id_label.grid(row=1, column=0, padx=10, pady=(0, 4), sticky="w")
 
         # Version info
         version_frame = ctk.CTkFrame(self, fg_color="transparent")
-        version_frame.grid(row=0, column=1, rowspan=2, padx=10, pady=8, sticky="e")
+        version_frame.grid(row=0, column=1, rowspan=2, padx=10, pady=4, sticky="e")
 
         self.version_label = ctk.CTkLabel(version_frame, text=f"v{package.version}", anchor="e")
         self.version_label.pack(side="left", padx=5)
@@ -53,34 +52,7 @@ class PackageRow(ctk.CTkFrame):
         else:
             self.update_btn.pack(side="left", padx=5)
 
-        self.check_update_btn = ctk.CTkButton(
-            self.btn_frame, text="Zkontrolovat", width=100,
-            command=self._check_update
-        )
-        self.check_update_btn.pack(side="left", padx=5)
-
         self.progress = ctk.CTkProgressBar(self.btn_frame, width=100, mode="indeterminate")
-
-    def _check_update(self):
-        if self.checking_update or self.action_in_progress:
-            return
-        self.checking_update = True
-        self.check_update_btn.configure(state="disabled", text="Kontroluji...")
-        self.on_status(f"Kontroluji aktualizace pro {self.package.name}...")
-
-        def on_version(version: Optional[str]):
-            self.checking_update = False
-            self.check_update_btn.configure(state="normal", text="Zkontrolovat")
-            if version and version != self.package.version:
-                self.package.available_version = version
-                self.update_indicator.configure(text=f"→ {version}", text_color="orange")
-                self.update_btn.pack(side="left", padx=5)
-                self.on_status(f"Nalezena nová verze {version} pro {self.package.name}")
-            else:
-                self.update_indicator.configure(text="Aktuální", text_color="green")
-                self.on_status(f"{self.package.name} je aktuální")
-
-        self.winget.get_available_version_async(self.package.id, on_version)
 
     def _uninstall(self):
         if self.action_in_progress:
@@ -118,7 +90,6 @@ class PackageRow(ctk.CTkFrame):
         self.action_in_progress = busy
         state = "disabled" if busy else "normal"
         self.uninstall_btn.configure(state=state)
-        self.check_update_btn.configure(state=state)
         if self.package.has_update:
             self.update_btn.configure(state=state)
         if busy:
