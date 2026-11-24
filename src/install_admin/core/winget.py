@@ -8,13 +8,14 @@ from ..models.package import Package
 class WingetClient:
     def __init__(self):
         self.timeout = 120
+        self.upgrade_timeout = 600  # 10 minutes for upgrades
 
-    def _run(self, args: List[str], elevated: bool = False) -> subprocess.CompletedProcess:
+    def _run(self, args: List[str], elevated: bool = False, timeout: Optional[int] = None) -> subprocess.CompletedProcess:
         cmd = ["winget"] + args
         if elevated:
             ps_cmd = f"Start-Process winget -ArgumentList '{' '.join(args)}' -Verb RunAs -Wait -PassThru"
             cmd = ["powershell", "-Command", ps_cmd]
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout)
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout or self.timeout)
 
     def list_installed(self) -> List[Package]:
         result = self._run(["list"])
@@ -137,7 +138,7 @@ class WingetClient:
         threading.Thread(target=worker, daemon=True).start()
 
     def upgrade(self, package_id: str, elevated: bool = True) -> bool:
-        result = self._run(["upgrade", "--id", package_id, "--silent", "--accept-source-agreements"], elevated)
+        result = self._run(["upgrade", "--id", package_id, "--silent", "--accept-source-agreements"], elevated, timeout=self.upgrade_timeout)
         return result.returncode == 0
 
     def upgrade_async(self, package_id: str, callback: Callable[[bool], None], elevated: bool = True):
