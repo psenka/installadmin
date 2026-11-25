@@ -38,7 +38,7 @@ class PackageRow(ctk.CTkFrame):
 
         self.update_indicator = ctk.CTkLabel(version_frame, text="", text_color="orange", font=ctk.CTkFont(size=11))
         self.update_indicator.pack(side="left", padx=5)
-        
+
         # Show available version immediately if update exists
         if package.has_update:
             self.update_indicator.configure(text=f"→ v{package.available_version}", text_color="orange")
@@ -62,6 +62,15 @@ class PackageRow(ctk.CTkFrame):
             self.update_btn.pack_forget()
         else:
             self.update_btn.pack(side="left", padx=5)
+
+        # Copy winget upgrade command button
+        if package.has_update:
+            self.copy_cmd_btn = ctk.CTkButton(
+                self.btn_frame, text="📋", width=32, height=28,
+                font=ctk.CTkFont(size=14),
+                command=self._copy_upgrade_command
+            )
+            self.copy_cmd_btn.pack(side="left", padx=2)
 
         self.progress = ctk.CTkProgressBar(self.btn_frame, width=100, mode="indeterminate")
 
@@ -111,3 +120,10 @@ class PackageRow(ctk.CTkFrame):
         else:
             self.progress.stop()
             self.progress.pack_forget()
+
+    def _copy_upgrade_command(self):
+        import tkinter as tk
+        cmd = f"winget upgrade \"{self.package.id}\""
+        self.clipboard_clear()
+        self.clipboard_append(cmd)
+        self.on_status(f"Zkopírováno: {cmd}")
