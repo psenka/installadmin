@@ -6,12 +6,13 @@ from install_admin.models.package import Package
 
 
 class SearchBar(ctk.CTkFrame):
-    def __init__(self, master, on_search: Callable[[str], None], on_select: Callable[[Package], None], get_installed_ids: Callable[[], set] = None):
+    def __init__(self, master, on_search: Callable[[str], None], on_select: Callable[[Package], None], get_installed_ids: Callable[[], set] = None, get_source_filter: Callable[[], Optional[str]] = None):
         super().__init__(master, fg_color="transparent")
         self.winget = WingetClient()
         self.on_search = on_search
         self.on_select = on_select
         self.get_installed_ids = get_installed_ids or (lambda: set())
+        self.get_source_filter = get_source_filter or (lambda: None)
         self.debounce_timer = None
         self.dropdown_visible = False
 
@@ -44,7 +45,8 @@ class SearchBar(ctk.CTkFrame):
         def on_results(packages: List[Package]):
             self.after(0, lambda: self._show_dropdown(packages))
 
-        self.winget.search_async(query, on_results)
+        source_filter = self.get_source_filter()
+        self.winget.search_async(query, on_results, source_filter)
 
     def _show_dropdown(self, packages: List[Package]):
         for widget in self.dropdown.winfo_children():

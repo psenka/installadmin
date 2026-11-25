@@ -15,11 +15,11 @@ class WingetClient:
         if elevated:
             ps_cmd = f"Start-Process winget -ArgumentList '{' '.join(args)}' -Verb RunAs -Wait -PassThru"
             cmd = ["powershell", "-Command", ps_cmd]
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout or self.timeout)
+        return subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout or self.timeout)
 
     def list_installed(self) -> List[Package]:
         result = self._run(["list"])
-        if result.returncode != 0:
+        if result.returncode != 0 or not result.stdout:
             raise RuntimeError(f"winget list failed: {result.stderr}")
         return self._parse_list_output(result.stdout)
 
@@ -56,12 +56,30 @@ class WingetClient:
             if not line.strip():
                 continue
 
-            # Fixed-width columns from header: Name(69), Id(86), Version(21), Available(14), Source(rest)
+            # Fixed-width columns from header: Name(69), Id(86), Version(20), Available(14), Source(rest)
+            # Header positions: Name@0, Id@69, Version@155, Available@175, Source@189
             name = line[0:69].strip()
             pkg_id = line[69:155].strip()
-            version = line[155:176].strip()
-            available = line[176:190].strip()
-            source = line[190:].strip()
+            version = line[155:175].strip()
+            available_raw = line[175:189].strip()
+            source = line[189:].strip() if len(line) > 189 else ''
+            
+            # Infer source from package ID if not explicitly shown
+            if not source:
+                if pkg_id.startswith('MSIX\\'):
+                    source = 'msstore'
+                elif pkg_id.startswith('ARP\\'):
+                    source = 'winget'
+                else:
+                    source = 'unknown'
+
+            # Parse available version: only if it looks like a version number (digits and dots)
+            # When no update, Available column is empty
+            available_version = None
+            if available_raw and re.match(r'^[\d\.]+', available_raw):
+                available_version = available_raw
+                if available_version == version:
+                    available_version = None
 
             pkg = Package(
                 name=name,
@@ -70,21 +88,24 @@ class WingetClient:
                 source=source,
                 is_installed=True
             )
-            if available and available != version:
-                pkg.available_version = available
+            if available_version:
+                pkg.available_version = available_version
             packages.append(pkg)
 
         return packages
 
-    def search(self, query: str) -> List[Package]:
-        result = self._run(["search", query])
-        if result.returncode != 0:
+    def search(self, query: str, source: Optional[str] = None) -> List[Package]:
+        args = ["search", query]
+        if source:
+            args.extend(["--source", source])
+        result = self._run(args)
+        if result.returncode != 0 or not result.stdout:
             return []
         return self._parse_search_output(result.stdout)
 
-    def search_async(self, query: str, callback: Callable[[List[Package]], None]):
+    def search_async(self, query: str, callback: Callable[[List[Package]], None], source: Optional[str] = None):
         def worker():
-            results = self.search(query)
+            results = self.search(query, source)
             callback(results)
         threading.Thread(target=worker, daemon=True).start()
 

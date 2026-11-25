@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox
-from typing import List
+from typing import List, Optional
 from .search_bar import SearchBar, ThemeToggle
 from .package_row import PackageRow
 from ..core.winget import WingetClient
@@ -37,6 +37,7 @@ class MainWindow(ctk.CTk):
         self.loaded_count = 0
         self.loading_more = False
         self.first_load_done = False
+        self.source_filter: Optional[str] = "winget"  # Default to winget only
 
         self._setup_ui()
         self._load_packages()
@@ -46,21 +47,34 @@ class MainWindow(ctk.CTk):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        # Top bar with search and theme toggle
+        # Top bar with search, source filter and theme toggle
         top_bar = ctk.CTkFrame(self, fg_color="transparent")
         top_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         top_bar.grid_columnconfigure(0, weight=1)
 
         self.search_bar = SearchBar(
-            top_bar,
-            on_search=self._on_search,
-            on_select=self._on_package_selected,
-            get_installed_ids=lambda: {p.id for p in self.packages}
-        )
+                    top_bar,
+                    on_search=self._on_search,
+                    on_select=self._on_package_selected,
+                    get_installed_ids=lambda: {p.id for p in self.packages},
+                    get_source_filter=lambda: self.source_filter
+                )
         self.search_bar.grid(row=0, column=0, sticky="ew")
 
+        # Source filter dropdown
+        self.source_filter_var = ctk.StringVar(value="winget")
+        self.source_filter_combo = ctk.CTkComboBox(
+            top_bar,
+            values=["Vše", "winget", "msstore", "Bez zdroje"],
+            variable=self.source_filter_var,
+            command=self._on_source_filter_change,
+            width=120,
+            height=36
+        )
+        self.source_filter_combo.grid(row=0, column=1, padx=(10, 0))
+
         self.theme_toggle = ThemeToggle(top_bar, on_toggle=self._on_theme_change)
-        self.theme_toggle.grid(row=0, column=1, sticky="e")
+        self.theme_toggle.grid(row=0, column=2, sticky="e")
 
         # Package list (scrollable)
         self.list_frame = ctk.CTkScrollableFrame(self, label_text="Nainstalované aplikace")
@@ -93,7 +107,8 @@ class MainWindow(ctk.CTk):
             self.loaded_count = 0
             self.first_load_done = False
             self._load_next_batch()
-            self.status_var.set(f"Nalezeno {len(packages)} balíčků")
+            filtered = self._get_filtered_packages()
+            self.status_var.set(f"Nalezeno {len(packages)} balíčků ({len(filtered)} po filtraci)")
             self.refresh_btn.configure(state="normal")
 
         def on_error(error: Exception):
@@ -103,11 +118,32 @@ class MainWindow(ctk.CTk):
 
         self.winget.list_installed_async(on_loaded, on_error)
 
+    def _get_filtered_packages(self) -> List[Package]:
+        """Return packages filtered by selected source."""
+        if self.source_filter == "Vše" or self.source_filter is None:
+            return self.packages
+        return [p for p in self.packages if p.source.lower() == self.source_filter.lower()]
+
+    def _on_source_filter_change(self, value: str):
+            """Handle source filter dropdown change."""
+            if value == "Vše":
+                self.source_filter = None
+            elif value == "Bez zdroje":
+                self.source_filter = "unknown"
+            else:
+                self.source_filter = value
+            self.loaded_count = 0
+            self.first_load_done = False
+            self._load_next_batch()
+            filtered = self._get_filtered_packages()
+            self.status_var.set(f"Filtrováno podle zdroje: {value} — {len(filtered)} balíčků")
+
     def _render_package_list(self):
         for widget in self.list_frame.winfo_children():
             widget.destroy()
 
-        sorted_packages = sorted(self.packages, key=lambda p: (not p.has_update, p.name.lower()))
+        filtered_packages = self._get_filtered_packages()
+        sorted_packages = sorted(filtered_packages, key=lambda p: (not p.has_update, p.name.lower()))
 
         for pkg in sorted_packages:
             row = PackageRow(self.list_frame, pkg, on_refresh=self._load_packages, on_status=self._set_status)
@@ -118,7 +154,8 @@ class MainWindow(ctk.CTk):
         if hasattr(self, 'load_more_btn'):
             self.load_more_btn.destroy()
 
-        sorted_packages = sorted(self.packages, key=lambda p: (not p.has_update, p.name.lower()))
+        filtered_packages = self._get_filtered_packages()
+        sorted_packages = sorted(filtered_packages, key=lambda p: (not p.has_update, p.name.lower()))
         
         # First load: batch_size items; subsequent loads: all remaining
         if not self.first_load_done:
@@ -138,9 +175,11 @@ class MainWindow(ctk.CTk):
             self._add_load_more_button()
 
     def _add_load_more_button(self):
+        filtered_packages = self._get_filtered_packages()
+        sorted_packages = sorted(filtered_packages, key=lambda p: (not p.has_update, p.name.lower()))
         load_more_btn = ctk.CTkButton(
             self.list_frame,
-            text=f"Načíst další ({len(sorted(self.packages, key=lambda p: (not p.has_update, p.name.lower()))) - self.loaded_count} zbývá)",
+            text=f"Načíst další ({len(sorted_packages) - self.loaded_count} zbývá)",
             command=self._load_next_batch,
             height=36
         )
